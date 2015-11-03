@@ -7,6 +7,7 @@ use Rack::Session::Cookie, :key => 'rack.session',
 
 BLACKJACK_AMOUNT = 21
 DEALER_HIT_MIN = 17
+INITIAL_AMOUNT = 500
 
 helpers do
 
@@ -57,17 +58,19 @@ helpers do
 
   def winner!(msg)
     @show_hit_or_stay_buttons = false
-    @success = msg + " #{session[:player_name]} wins!"
+    @winner = msg + " #{session[:player_name]} wins!"
+    session[:player_money] += session[:bet]
   end
 
   def loser!(msg)
     @show_hit_or_stay_buttons = false
-    @error = msg + " #{session[:player_name]} loses!"
+    @loser = msg + " #{session[:player_name]} loses!"
+    session[:player_money] -= session[:bet]
   end
 
   def tie!(msg)
     @show_hit_or_stay_buttons = false
-    @error = msg + " #{session[:player_name]} and dealer are tied!"
+    @winner = msg + " #{session[:player_name]} and dealer are tied!"
   end
 
 end
@@ -85,6 +88,7 @@ get '/' do
 end
 
 get '/new_player' do
+  session[:player_money] = INITIAL_AMOUNT
   erb :new_player
 end
 
@@ -95,6 +99,23 @@ post '/new_player' do
   end
 
   session[:player_name] = params[:player_name]
+  redirect '/bet'
+end
+
+get '/bet' do
+  erb :bet
+end
+
+post '/bet' do
+  if params[:bet].to_i > session[:player_money]
+    @error = "You don't have enough money to bet that much! Please place a smaller bet."
+    halt erb :bet
+  elsif params[:bet].to_i < 0
+    @error = "That is not a valid bet. Please place a different bet."
+    halt erb :bet
+  end
+
+  session[:bet] = params[:bet].to_i
   redirect '/game'
 end
 
@@ -129,7 +150,7 @@ post '/game/player/hit' do
     loser!("#{session[:player_name]} busted.")
   end
 
-  erb :game
+  erb :game, layout: false
 end
 
 post '/game/player/stay' do
@@ -152,12 +173,12 @@ get '/game/dealer' do
     @show_dealer_hit_button = true
   end
 
-  erb :game
+  erb :game, layout: false
 end
 
 post '/game/dealer/hit' do
   session[:dealer_cards] << session[:deck].pop
-  redirect 'game/dealer'  
+  redirect '/game/dealer'  
 end
 
 get '/game/compare' do
@@ -173,7 +194,7 @@ get '/game/compare' do
     tie!("#{session[:player_name]}'s total equals dealer's total.")
   end 
 
-  erb :game
+  erb :game, layout: false
 end
 
 
